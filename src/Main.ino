@@ -1,3 +1,6 @@
+#include <Ambient.h>      // Ambient.h をインクルード
+#include <WiFi.h>         // WiFi.h をインクルード
+
 #include <TinyGPS++.h> // Download and install the library at http://arduiniana.org/libraries/tinygpsplus/ 
 #include <HardwareSerial.h> // should already be installed with Arduino IDE
 #include "EEPROM.h" // should already be installed with Arduino IDE
@@ -18,6 +21,10 @@
 */
 #define EEPROM_SIZE 128
 
+#define PERIOD 30         // delay の値を指定 (例：30 -> 30秒間間隔でデーターをAmbientに送信)
+WiFiClient client;        // WiFiClientを使うための設定(インスタンス生成)
+Ambient ambient;          // Ambientを使うための設定(インスタンス生成)
+
 /*
    Next, the program object for the GPS is created, we call
    the variable that points to it simply "gps"
@@ -33,6 +40,18 @@ TinyGPSPlus gps;
    Distinguished connections. For ESP32 this value can be 0, 1 or 2
 */
 HardwareSerial SerialGPS(1);
+
+/***************************************/
+/*** ここから 環境によって書き換える ***/
+/***************************************/
+
+//WiFi設定
+const char* ssid     =  "your-ssid" ; 
+const char* password =  "your-password";
+//Ambient設定
+unsigned int channelId =  your-channelId;
+const char* writeKey =  "your-writeKey";
+
 
 /*
    Next, we create a template object where we get all the data
@@ -90,6 +109,21 @@ void setup() {
 
   // Serial is the output in the Serial Monitor
   Serial.begin(115200);
+
+  // Wi-Fiの初期化
+  WiFi.begin(ssid, password);
+  Serial.print("WiFi connecting");
+
+  // Wi-Fiアクセスポイントへの接続待ち
+  while (WiFi.status() != WL_CONNECTED) {
+      Serial.print(".");
+      delay(500);
+  }
+
+  Serial.println(" connected"); // Wi-Fi に接続したらコンソール画面に connected を表示
+
+  // チャネルIDとライトキーを指定してAmbientの初期化
+  ambient.begin(channelId, writeKey, &client);
 
   /*
       The connection with the GPS module. We
@@ -201,7 +235,20 @@ void loop() {
     Serial.print("DST: ");
     Serial.println(gpsState.dist, 1);
     nextSerialTaskTs = millis() + TASK_SERIAL_RATE;
+
+    // データーがint型かfloat型であれば、直接セットすることができます。
+    // d9に緯度
+    ambient.set(9, gps.location.lat()); 
+  
+    // d10に経度をセット
+    ambient.set(10, gps.location.lng());
+  
+    // Ambientにデーターを送信         
+    ambient.send();                   
+  
   }
 
+    // 30秒間待つ
+    delay(PERIOD * 1000);  
 
 }
